@@ -5,7 +5,7 @@ A Go client for the [Blockscout](https://www.blockscout.com/) API, designed for 
 ## Installation
 
 ```bash
-go get blockscout
+go get github.com/heltonmarx/blockscout
 ```
 
 ## Quick start
