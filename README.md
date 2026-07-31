@@ -71,8 +71,9 @@ Every API call is retried up to **3 times** with exponential back-off and up to 
 |-----------|---------|
 | `context.Canceled` / `context.DeadlineExceeded` | No — propagated immediately |
 | HTTP 429 Too Many Requests | **Yes** — server-side rate limit, back off and retry |
-| HTTP 5xx | No — marked `Unrecoverable`, stops the loop immediately |
-| Any other HTTP error (4xx, etc.) | No |
+| HTTP 5xx (except 501) | **Yes** — transient server errors, back off and retry |
+| HTTP 501 Not Implemented | No — marked `Unrecoverable`, stops the loop immediately |
+| HTTP 4xx (except 429) | No — marked `Unrecoverable`, stops the loop immediately |
 | `net.Error` (connection timeout, reset) | Yes |
 | `io.EOF` / `io.ErrUnexpectedEOF` | Yes |
 
