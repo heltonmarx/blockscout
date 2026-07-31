@@ -96,6 +96,9 @@ func (e *statusError) Error() string {
 }
 
 func isUnrecoverable(code int) bool {
+	if code == http.StatusTooManyRequests {
+		return false // 429 — serverr rate limit, back off and retry
+	}
 	if code == http.StatusNotImplemented {
 		return true
 	}

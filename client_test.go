@@ -264,7 +264,7 @@ func TestIsRetryable(t *testing.T) {
 	assert.True(t, isRetryable(&statusError{code: http.StatusServiceUnavailable}))
 	assert.True(t, isRetryable(&statusError{code: http.StatusGatewayTimeout}))
 	// 4xx and 501 are unrecoverable — not retryable
-	assert.False(t, isRetryable(&statusError{code: http.StatusTooManyRequests}))
+	assert.True(t, isRetryable(&statusError{code: http.StatusTooManyRequests}))
 	assert.False(t, isRetryable(&statusError{code: http.StatusNotFound}))
 	assert.False(t, isRetryable(&statusError{code: http.StatusBadRequest}))
 	assert.False(t, isRetryable(&statusError{code: http.StatusForbidden}))

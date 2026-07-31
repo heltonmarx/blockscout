@@ -110,16 +110,22 @@ func TestHTTPClient_501IsUnrecoverable(t *testing.T) {
 	assert.Equal(t, 1, calls, "501 should stop retries immediately")
 }
 
-func TestHTTPClient_429IsUnrecoverable(t *testing.T) {
+func TestHTTPClient_429IsRetried(t *testing.T) {
 	calls := 0
 	c, _ := newTestHTTPClient(t, func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		w.WriteHeader(http.StatusTooManyRequests)
+		if calls < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
 
-	_, err := c.Get(context.Background(), "", retryTestOpts()...)
-	require.Error(t, err)
-	assert.Equal(t, 1, calls, "429 should stop retries immediately")
+	buf, err := c.Get(context.Background(), "", retryTestOpts()...)
+	require.NoError(t, err)
+	assert.Equal(t, 3, calls, "429 should be retried")
+	assert.NotEmpty(t, buf)
 }
 
 func TestHTTPClient_ContextCancellation(t *testing.T) {
@@ -141,7 +147,7 @@ func TestIsUnrecoverable(t *testing.T) {
 	assert.True(t, isUnrecoverable(http.StatusUnauthorized))
 	assert.True(t, isUnrecoverable(http.StatusForbidden))
 	assert.True(t, isUnrecoverable(http.StatusNotFound))
-	assert.True(t, isUnrecoverable(http.StatusTooManyRequests))
+	assert.False(t, isUnrecoverable(http.StatusTooManyRequests))
 	// 501 is the only 5xx that is unrecoverable
 	assert.True(t, isUnrecoverable(http.StatusNotImplemented))
 	// 5xx (except 501) are transient and retryable
