@@ -1,4 +1,4 @@
-module blockscout
+module github.com/heltonmarx/blockscout
 
 go 1.26.5
 
