@@ -80,25 +80,12 @@ func TestHTTPClient_Non2xxIsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "404")
 }
 
-func TestHTTPClient_5xxIsUnrecoverable(t *testing.T) {
-	calls := 0
-	c, _ := newTestHTTPClient(t, func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		w.WriteHeader(http.StatusInternalServerError)
-	})
-
-	_, err := c.Get(context.Background(), "")
-	require.Error(t, err)
-	// retry.Unrecoverable stops retries immediately — expect exactly 1 call.
-	assert.Equal(t, 1, calls)
-}
-
-func TestHTTPClient_429IsRetried(t *testing.T) {
+func TestHTTPClient_5xxIsRetried(t *testing.T) {
 	calls := 0
 	c, _ := newTestHTTPClient(t, func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if calls < 3 {
-			w.WriteHeader(http.StatusTooManyRequests)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -107,8 +94,32 @@ func TestHTTPClient_429IsRetried(t *testing.T) {
 
 	buf, err := c.Get(context.Background(), "", retryTestOpts()...)
 	require.NoError(t, err)
-	assert.Equal(t, 3, calls, "should have retried on 429")
+	assert.Equal(t, 3, calls, "should have retried on 500")
 	assert.NotEmpty(t, buf)
+}
+
+func TestHTTPClient_501IsUnrecoverable(t *testing.T) {
+	calls := 0
+	c, _ := newTestHTTPClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusNotImplemented)
+	})
+
+	_, err := c.Get(context.Background(), "", retryTestOpts()...)
+	require.Error(t, err)
+	assert.Equal(t, 1, calls, "501 should stop retries immediately")
+}
+
+func TestHTTPClient_429IsUnrecoverable(t *testing.T) {
+	calls := 0
+	c, _ := newTestHTTPClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusTooManyRequests)
+	})
+
+	_, err := c.Get(context.Background(), "", retryTestOpts()...)
+	require.Error(t, err)
+	assert.Equal(t, 1, calls, "429 should stop retries immediately")
 }
 
 func TestHTTPClient_ContextCancellation(t *testing.T) {
@@ -125,11 +136,20 @@ func TestHTTPClient_ContextCancellation(t *testing.T) {
 }
 
 func TestIsUnrecoverable(t *testing.T) {
-	assert.True(t, isUnrecoverable(http.StatusInternalServerError))
-	assert.True(t, isUnrecoverable(http.StatusBadGateway))
-	assert.True(t, isUnrecoverable(http.StatusServiceUnavailable))
-	assert.False(t, isUnrecoverable(http.StatusTooManyRequests))
-	assert.False(t, isUnrecoverable(http.StatusNotFound))
+	// 4xx (except 429 — same rule) are unrecoverable client errors
+	assert.True(t, isUnrecoverable(http.StatusBadRequest))
+	assert.True(t, isUnrecoverable(http.StatusUnauthorized))
+	assert.True(t, isUnrecoverable(http.StatusForbidden))
+	assert.True(t, isUnrecoverable(http.StatusNotFound))
+	assert.True(t, isUnrecoverable(http.StatusTooManyRequests))
+	// 501 is the only 5xx that is unrecoverable
+	assert.True(t, isUnrecoverable(http.StatusNotImplemented))
+	// 5xx (except 501) are transient and retryable
+	assert.False(t, isUnrecoverable(http.StatusInternalServerError))
+	assert.False(t, isUnrecoverable(http.StatusBadGateway))
+	assert.False(t, isUnrecoverable(http.StatusServiceUnavailable))
+	assert.False(t, isUnrecoverable(http.StatusGatewayTimeout))
+	// 2xx are not errors at all
 	assert.False(t, isUnrecoverable(http.StatusOK))
 }
 

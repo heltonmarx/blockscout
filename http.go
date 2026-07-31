@@ -96,8 +96,13 @@ func (e *statusError) Error() string {
 }
 
 func isUnrecoverable(code int) bool {
-	// 429 is intentionally excluded: the retry loop should back off and retry on rate limiting.
-	return code >= http.StatusInternalServerError
+	if code == http.StatusNotImplemented {
+		return true
+	}
+	if code >= http.StatusInternalServerError {
+		return false
+	}
+	return code >= http.StatusBadRequest
 }
 
 func is200Range(code int) bool {

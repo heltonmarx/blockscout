@@ -258,10 +258,17 @@ func TestRateLimiterMiddleware_NilLimiterSkipped(t *testing.T) {
 func TestIsRetryable(t *testing.T) {
 	assert.False(t, isRetryable(context.Canceled))
 	assert.False(t, isRetryable(context.DeadlineExceeded))
-	assert.True(t, isRetryable(&statusError{code: http.StatusTooManyRequests}))
+	// 5xx (except 501) are transient — retryable
+	assert.True(t, isRetryable(&statusError{code: http.StatusInternalServerError}))
+	assert.True(t, isRetryable(&statusError{code: http.StatusBadGateway}))
+	assert.True(t, isRetryable(&statusError{code: http.StatusServiceUnavailable}))
+	assert.True(t, isRetryable(&statusError{code: http.StatusGatewayTimeout}))
+	// 4xx and 501 are unrecoverable — not retryable
+	assert.False(t, isRetryable(&statusError{code: http.StatusTooManyRequests}))
 	assert.False(t, isRetryable(&statusError{code: http.StatusNotFound}))
 	assert.False(t, isRetryable(&statusError{code: http.StatusBadRequest}))
 	assert.False(t, isRetryable(&statusError{code: http.StatusForbidden}))
+	assert.False(t, isRetryable(&statusError{code: http.StatusNotImplemented}))
 }
 
 // --- get: envelope parsing ---

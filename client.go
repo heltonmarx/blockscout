@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -156,7 +155,7 @@ func isRetryable(err error) bool {
 		return false
 	}
 	if se, ok := errors.AsType[*statusError](err); ok {
-		return se.code == http.StatusTooManyRequests
+		return !isUnrecoverable(se.code)
 	}
 	if _, ok := errors.AsType[net.Error](err); ok {
 		return true
